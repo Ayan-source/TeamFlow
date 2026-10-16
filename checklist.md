@@ -56,7 +56,7 @@ Planning comes first. Complete the planning tasks and obtain approval before the
   - Test: Read the overview as a new user. Acceptance: README.md explains what users can do and the V1 scope.
 - [x] **0.2** Create HLD diagrams for V1, V2 and V3
   - Test: Read the three boxed text HLD diagrams and trace request, cache, email and failure/recovery paths. Acceptance: docs/architecture.md explains component ownership and shows V1 PostgreSQL, V2 Redis and V3 RabbitMQ with a separate worker, using numbered architecture sections.
-- [ ] **0.3** Create a simple database ERD
+- [x] **0.3** Create a simple database ERD
   - Test: Trace a workspace, project, task, comment and notification through the ERD. Acceptance: Relationships, keys and Supabase Auth user references are clear.
 - [ ] **0.4** Define API endpoints and user flows
   - Test: Walk through signup to assignment, comment and notification using the endpoint plan. Acceptance: Methods, paths, auth, permissions, request/response examples and error cases are documented in docs/architecture.md.

@@ -52,6 +52,6 @@ Phase 0 planning is in progress. The GitHub repository and initial commit are re
 - [progress.md](progress.md): simple task statuses and the next task.
 - [prompt.md](prompt.md): project instructions and working rules.
 
-The [architecture document](docs/architecture.md) contains the V1, V2 and V3 HLD diagrams as plain text. Upcoming planning tasks will add the PostgreSQL ERD and API plan there, the full roadmap in `docs/roadmap.md`, and reproducible experiments in `docs/experiments.md`.
+The [architecture document](docs/architecture.md) contains the V1, V2 and V3 HLD diagrams and PostgreSQL ERD as plain text. Upcoming planning tasks will add the API plan there, the full roadmap in `docs/roadmap.md`, and reproducible experiments in `docs/experiments.md`.
 
 After the planning files are ready, review and approve the proposed architecture and folder structure before application setup begins. Each task is completed, checked, recorded, committed and pushed separately; the next task waits for review.

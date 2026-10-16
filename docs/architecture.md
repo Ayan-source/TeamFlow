@@ -1,8 +1,8 @@
 # TeamFlow — Architecture and data flow plan
 
-This is the Phase 0 HLD for task **0.2**. It describes the planned components, their responsibilities, how requests move, and how failures recover. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
+This Phase 0 design contains the HLD for task **0.2** and the database ERD for task **0.3**. It describes planned components, data relationships, request paths and failure recovery. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
 
-HLD mein hum system ke main parts, unki responsibility aur unke connections samajhte hain. Database ERD is task **0.3**; API endpoints are task **0.4**.
+HLD mein hum system ke main parts, unki responsibility aur unke connections samajhte hain. Section 8 contains the ERD; API endpoints will be added in task **0.4**.
 
 ## 1. System context and ownership
 
@@ -268,3 +268,164 @@ To review this HLD:
 5. Confirm the version boundaries: PostgreSQL in V1, Redis in V2, RabbitMQ and a separate worker in V3.
 
 **Interview explanation:** Pehle PostgreSQL app ka baseline measure karenge. Repeated reads costly hon to Redis evaluate karenge. Slow ya unreliable email processing ke liye RabbitMQ worker, retries, idempotency aur outbox use karenge. Har decision ka benefit aur cost measurements se explain karenge.
+
+## 8. PostgreSQL database ERD
+
+This is the planned logical schema. Tables and migrations will be implemented in their numbered tasks. Application tables use the `public` schema and Prisma; Supabase manages the `auth` schema.
+
+**Legend:** `PK` = primary key, `FK` = foreign key, `?` = nullable, `1` = exactly one, and `0..*` = zero or more. Unless shown otherwise, IDs are UUIDs and timestamps use `timestamptz`.
+
+**Simple explanation:** PK har row ki unique pehchan hai. FK doosri table ki row se link banata hai. ERD se samajh aata hai ke user, workspace aur task ka data aapas mein kaise connected hai.
+
+### 8.1 Identity and workspace membership
+
+```text
++------------------------------+
+| auth.users (Supabase-managed) |
+| id PK                        |
++------------------------------+
+                1
+                | Same user ID
+              0..1
++------------------------------+
+| profiles                     |
+| id PK, FK -> auth.users.id    |
+| email UNIQUE                 |
+| display_name?                |
++------------------------------+
+                1
+                |
+              0..*
++------------------------------+           +---------------------------+
+| workspace_members            |   0..*    | workspaces                |
+| workspace_id PK, FK          | --------> | id PK                     |
+| user_id PK, FK -> profiles   |      1    | owner_id FK -> profiles   |
+| joined_at                    |           | name                      |
++------------------------------+           +---------------------------+
+
+workspace_members.workspace_id -> workspaces.id
+workspaces.owner_id            -> profiles.id
+One profile can own zero or more workspaces.
+```
+
+Each application profile shares its primary key with its Supabase Auth user. We reference `auth.users.id`, which is the managed table's primary key, and keep application profile data in our own table. This follows [Supabase's user-data guidance](https://supabase.com/docs/guides/auth/managing-user-data).
+
+An Auth account can temporarily have no application profile; the auth integration must create or synchronize the profile before workspace actions are allowed. The profile's email comes from trusted Supabase Auth data, is normalized for lookup, and stays synchronized when that verified email changes. Passwords and sessions remain managed by Supabase Auth. Prisma migrations manage our application tables and their references without taking ownership of Supabase's Auth tables.
+
+`workspace_members` connects users and workspaces: one user can join many workspaces, and one workspace can have many users. Its composite primary key `(workspace_id, user_id)` prevents duplicate membership. Creating a workspace also adds its owner as a member in the same transaction.
+
+For the MVP, `workspaces.owner_id` identifies the owner; other joined users are members. The owner stays a member and cannot remove themselves through the member-removal action. Adding an existing user by email creates a membership directly; a pending invitation/acceptance workflow is outside the current checklist.
+
+### 8.2 Project, task, comment and notification relationships
+
+```text
++-----------------------------------+
+| workspaces                        |
+| id PK                             |
++-----------------------------------+
+                 1
+                 |
+               0..*
++-----------------------------------+
+| projects                          |
+| id PK                             |
+| workspace_id FK -> workspaces.id   |
+| created_by FK -> profiles.id       |
++-----------------------------------+
+                 1
+                 |
+               0..*
++-----------------------------------+
+| tasks                             |
+| id PK                             |
+| project_id FK -> projects.id       |
+| created_by FK -> profiles.id       |
+| assignee_id? FK -> profiles.id     |
++-----------------------------------+
+                 1
+                 |
+                 +---- 0..* comments
+                 |         id PK
+                 |         task_id FK -> tasks.id
+                 |         author_id FK -> profiles.id
+                 |
+                 +---- 0..* notifications
+                           id PK
+                           task_id? FK -> tasks.id
+                           recipient_id FK -> profiles.id
+
+One profile can create many projects/tasks, write many comments,
+receive many notifications, and be assigned many tasks.
+A task has zero or one assignee.
+```
+
+Every project belongs to one workspace; every task belongs to one project. The API follows `task -> project -> workspace` when checking access. A comment belongs to one task. A notification has one recipient and may retain its text after its linked task is deleted.
+
+### 8.3 V1 tables and fields
+
+The diagram highlights relationships; this table lists the planned fields. Fields are required unless marked `?` or given a nullable rule.
+
+| Table | Primary key | Foreign keys | Other fields |
+| --- | --- | --- | --- |
+| `profiles` | `id` | `id -> auth.users.id` | `email text UNIQUE`, `display_name text?`, `created_at`, `updated_at` |
+| `workspaces` | `id` | `owner_id -> profiles.id` | `name text`, `created_at`, `updated_at` |
+| `workspace_members` | `(workspace_id, user_id)` | `workspace_id -> workspaces.id`, `user_id -> profiles.id` | `joined_at` |
+| `projects` | `id` | `workspace_id -> workspaces.id`, `created_by -> profiles.id` | `name text`, `created_at`, `updated_at` |
+| `tasks` | `id` | `project_id -> projects.id`, `created_by -> profiles.id`, `assignee_id? -> profiles.id` | `title text`, `description text` default empty, `status`, `due_date date?`, `created_at`, `updated_at` |
+| `comments` | `id` | `task_id -> tasks.id`, `author_id -> profiles.id` | `body text`, `created_at` |
+| `notifications` | `id` | `recipient_id -> profiles.id`, `task_id? -> tasks.id` | `type` initially `task_assigned`, `message text`, `read_at?`, `created_at` |
+
+Task status uses the database values `todo`, `in_progress` and `done`, displayed as Todo, In Progress and Done. A due date is a calendar date; `read_at` is a nullable timestamp, with null meaning unread. Names, task titles and comment bodies must not be blank.
+
+### 8.4 Integrity, deletion and access rules
+
+- Foreign keys enforce existing parents. Database constraints enforce unique membership, unique normalized profile email and valid task status. Input validation provides useful errors before database writes.
+- `tasks.assignee_id` references a profile, so the FK alone does not establish workspace membership. The assignment transaction must verify membership in the task's workspace. Assignment and member removal must coordinate concurrent writes so a removed user cannot remain assigned accidentally.
+- Removing a member clears that user's task assignments in the workspace in the same transaction, then removes their membership. Their existing comments and creator references remain as history. Later requests must fail current membership checks, including requests that could hit Redis.
+- Project deletion cascades to its tasks; task deletion cascades to its comments. Notification `task_id` uses `ON DELETE SET NULL`, preserving the notification message and recipient after task deletion.
+- Workspace/profile deletion is not an MVP action. References to these rows use restrictive deletion rules so an administrative delete cannot silently erase a team's work. Any later account-deletion flow needs an explicit cleanup policy, including its Auth/profile relationship.
+- Application data is accessed through Express. Restrict direct client access through Supabase Data API grants/RLS; API permission checks still apply to Prisma operations and must not assume direct database queries automatically inherit a user's Supabase session.
+
+Initial indexes follow the planned lookups: membership by `user_id`, projects by `workspace_id`, tasks by `(project_id, status)` and `assignee_id`, comments by `(task_id, created_at)`, and notifications by `(recipient_id, created_at)`. Primary/unique keys already index profile IDs, emails and workspace membership pairs. Measure query plans before adding further indexes.
+
+### 8.5 Planned V3 reliability tables
+
+V2 reuses the V1 PostgreSQL model; Redis stores its own temporary keys. The following tables are added during Phase 10 reliability tasks.
+
+```text
+Assignment transaction
+        |
+        +-> Update tasks
+        +-> Insert notifications
+        +-> Insert outbox_events
+                       |
+                       | Same event ID in RabbitMQ messages
+                       v
+                Worker consumer
+                       |
+                       +-> processed_events
+                           Record completed processing by event ID.
+```
+
+| Table | Key and core fields | Purpose |
+| --- | --- | --- |
+| `outbox_events` | `id uuid PK`, `event_type text`, `payload jsonb`, `created_at`, `published_at?` | Commit a pending event with the assignment and notification; record publication only after broker confirmation. |
+| `processed_events` | `event_id uuid PK`, `processed_at` | Uniquely record completed processing for the email consumer. |
+
+`processed_events.event_id` uses the event ID from `outbox_events.id`; this is a logical link, without a database FK, so retiring a published outbox row does not erase deduplication records. Worker claims, retry metadata and retention will be finalized in the reliability tasks. Concurrent deliveries must coordinate processing; checking for an existing row alone is insufficient. External email duplication limits remain as described in section 5.
+
+### 8.6 Manual review and acceptance
+
+Use this example to trace the relationships on paper:
+
+1. Profiles `U1` and `U2` correspond to two Supabase Auth IDs.
+2. `U1` creates workspace `W1`; memberships `(W1, U1)` and `(W1, U2)` connect both users to it. The owner is `U1`.
+3. Project `P1` references `W1`. Task `T1` references `P1`, is created by `U1`, and is assigned to member `U2`.
+4. Comment `C1` references `T1` and author `U2`. Notification `N1` references `T1` and recipient `U2`; null `read_at` means unread.
+5. A repeated `(W1, U2)` membership is rejected by the composite PK. A missing project ID fails the task FK. Assigning an existing user outside `W1` must fail the API membership check.
+6. Deleting `T1` deletes `C1`, keeps `N1` and clears `N1.task_id`. Removing `U2` instead clears their assignments and access while preserving authorship history.
+7. In final V3, one transaction also creates event `E1` in `outbox_events`. Publication and consumption use `E1` to recover and deduplicate work.
+
+These are design checks; no live database or migration has been created. Implementation tasks will run database and permission tests against these rules.
+
+**Interview explanation:** Users aur workspaces ka many-to-many relation membership table se banta hai. Task ka workspace project ke through milta hai. PK/FK data integrity protect karte hain; membership authorization API transaction check karti hai. Redis speed improve kar sakta hai aur outbox email events recover karta hai, lekin dono permission checks ki jagah nahi lete.
