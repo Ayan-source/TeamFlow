@@ -1,8 +1,8 @@
 # TeamFlow — Architecture and data flow plan
 
-This Phase 0 design contains the HLD for task **0.2** and the database ERD for task **0.3**. It describes planned components, data relationships, request paths and failure recovery. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
+This Phase 0 design contains the HLD for task **0.2**, database ERD for task **0.3**, and API plan for task **0.4**. It describes planned components, data relationships, request paths and failure recovery. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
 
-HLD mein hum system ke main parts, unki responsibility aur unke connections samajhte hain. Section 8 contains the ERD; API endpoints will be added in task **0.4**.
+HLD mein hum system ke main parts, unki responsibility aur unke connections samajhte hain. Section 8 contains the ERD; section 9 contains the API endpoints and user flows.
 
 ## 1. System context and ownership
 
@@ -429,3 +429,213 @@ Use this example to trace the relationships on paper:
 These are design checks; no live database or migration has been created. Implementation tasks will run database and permission tests against these rules.
 
 **Interview explanation:** Users aur workspaces ka many-to-many relation membership table se banta hai. Task ka workspace project ke through milta hai. PK/FK data integrity protect karte hain; membership authorization API transaction check karti hai. Redis speed improve kar sakta hai aur outbox email events recover karta hai, lekin dono permission checks ki jagah nahi lete.
+
+## 9. API endpoints and user flows
+
+This is the planned contract for task **0.4**. Routes are implemented in their existing roadmap tasks. The application is still in planning; the examples below are design examples.
+
+**Simple explanation:** API contract frontend aur backend ka agreement hai: kis URL par kya request bhejni hai, kya response milega, aur kaun action kar sakta hai.
+
+### 9.1 Common request and response rules
+
+- Application routes use the prefix `/api/v1`. The public health route is `GET /health`.
+- Protected routes require `Authorization: Bearer <supabase-access-token>`. The server verifies it and derives the acting user; request bodies cannot choose the acting user or creator.
+- JSON request/response fields use camelCase, mapping to the ERD's snake_case database fields. IDs are UUID strings; timestamps are UTC ISO 8601 strings; `dueDate` is `YYYY-MM-DD` or null.
+- A single-resource response is `{ "data": <resource> }`. Creation returns `201`, reads/updates return `200`, and successful deletion returns `204` with no response body.
+- List routes accept integer `page >= 1` and `limit` from 1 to 100, defaulting to 1 and 20. Responses use `{ "data": [], "meta": { "page": 1, "limit": 20, "total": 0 } }`. The total counts only accessible records matching the filters. Invalid pagination returns `400`; an empty accessible list returns `200`.
+- Lists use stable ordering: workspaces/projects/tasks by `createdAt` then ID ascending; comments by `createdAt` then ID ascending; notifications by `createdAt` then ID descending; members by `joinedAt` then `userId` ascending. Comparisons and load tests use the same pagination and filters.
+- Unknown body/query fields, invalid UUIDs, empty workspace/project/task edit patches and invalid field values return `400`. Names are trimmed, nonblank and at most 100 characters; task titles at most 200; descriptions at most 10,000; comments nonblank and at most 5,000. Emails are trimmed, validated and normalized for lookup. The explicit mark-as-read action takes no body.
+- Task status is one of `todo`, `in_progress`, `done`. Omitted patch fields stay unchanged; `dueDate: null` clears the date. Nullable assignment is handled by its dedicated route.
+- Membership is checked before returning workspace resources or cached results. Resources outside the caller's workspace return `404`, the same as a missing resource. An existing member attempting an owner-only action receives `403`.
+
+The lists are bounded from V1 onward; the baseline must demonstrate actual query cost under this contract rather than introduce an artificial unbounded response later.
+
+### 9.2 Authentication and profile synchronization
+
+The frontend uses the Supabase client for [signup](https://supabase.com/docs/reference/javascript/auth-signup), [password login](https://supabase.com/docs/reference/javascript/auth-signinwithpassword), and [logout](https://supabase.com/docs/reference/javascript/auth-signout). These provider actions have Supabase's response/error format; Express routes follow our application envelope.
+
+| User action | Provider call | Input | Expected outcome |
+| --- | --- | --- | --- |
+| Sign up | `supabase.auth.signUp` | Email and password | Show the provider result; when confirmation is enabled, ask the user to confirm before expecting a session. |
+| Log in | `supabase.auth.signInWithPassword` | Email and password | Receive a valid session or show a useful auth error. |
+| Refresh page | Supabase session restoration/refresh | Existing session | Keep a valid user signed in; require login when a session cannot be restored. |
+| Log out | `supabase.auth.signOut` | Current session | Clear local user/session state after success and return to login. |
+
+| Method and path | Access | Request | Success |
+| --- | --- | --- | --- |
+| `GET /health` | Public | No body | `200 { "status": "ok" }`; process liveness only, without leaking configuration. |
+| `POST /api/v1/auth/sync` | Verified Auth user | No body | `200` Profile; idempotently create/sync the caller's profile from trusted Auth data. |
+| `GET /api/v1/me` | Verified Auth user with profile | No body | `200` Profile for the caller. |
+
+After a session is established, sync the profile before opening workspace pages. A repeated sync must not create a duplicate profile. All protected application routes except sync require that profile; if it is missing, return `409 PROFILE_NOT_READY` and let the frontend retry sync. A profile lookup failure must not bypass authorization.
+
+### 9.3 Workspaces and members
+
+Here and below, paths omit the `/api/v1` prefix for readability. **Member** means a current member of the resource's workspace, including its owner. **Owner** means that member also matches `workspaces.owner_id`.
+
+| Method and path | Access | Request body | Success |
+| --- | --- | --- | --- |
+| `POST /workspaces` | Signed-in user | `{ "name": "Engineering" }` | `201` Workspace; create the owner membership in the same transaction. |
+| `GET /workspaces` | Signed-in user | None | `200` paginated Workspaces the caller belongs to. |
+| `GET /workspaces/:workspaceId` | Member | None | `200` Workspace; combine with its project list for the workspace dashboard. |
+| `PATCH /workspaces/:workspaceId` | Owner | `{ "name": "Platform" }` | `200` updated Workspace. |
+| `GET /workspaces/:workspaceId/members` | Member | None | `200` paginated Memberships, including member display details. |
+| `POST /workspaces/:workspaceId/members` | Owner | `{ "email": "member@example.com" }` | `201` Membership for an existing TeamFlow profile. |
+| `DELETE /workspaces/:workspaceId/members/:userId` | Owner | None | `204`; clear the removed member's assignments in this workspace in the same transaction. |
+
+Adding an existing member returns `409 ALREADY_MEMBER`; an unknown invitee returns `404 USER_NOT_FOUND` after checking the owner's permission. Removing the owner returns `409 OWNER_REMOVAL_NOT_ALLOWED`; removing a missing membership returns `404`. A signed-in outsider receives `404` on workspace-specific routes. Historical comments and creator references survive member removal.
+
+### 9.4 Projects and dashboard reads
+
+| Method and path | Access | Request body | Success |
+| --- | --- | --- | --- |
+| `POST /workspaces/:workspaceId/projects` | Member | `{ "name": "Website refresh" }` | `201` Project. |
+| `GET /workspaces/:workspaceId/projects` | Member | None | `200` paginated Projects in that workspace. |
+| `GET /projects/:projectId` | Member | None | `200` Project. |
+| `PATCH /projects/:projectId` | Member | `{ "name": "Website launch" }` | `200` updated Project. |
+| `DELETE /projects/:projectId` | Member | None | `204`; cascade through tasks/comments and clear linked notification task IDs. |
+| `GET /projects/:projectId/dashboard` | Member | None | `200` Dashboard with `projectId`, `taskCount` and `taskCounts` by status. |
+
+The dashboard read is the baseline measurement and V2 cache target. It is implemented as part of the existing project-dashboard/baseline tasks. V1 calculates the counts in PostgreSQL; V2 may cache the same authorized response. Counts cover the whole project, independent of task-list pagination.
+
+All current members can manage projects and tasks in their workspace. Workspace renaming and membership changes require its owner. Delete confirmation is a frontend step; the API still checks permission for every DELETE request.
+
+### 9.5 Tasks, assignment and comments
+
+| Method and path | Access | Request body/query | Success |
+| --- | --- | --- | --- |
+| `POST /projects/:projectId/tasks` | Member | `{ "title": "Build signup page", "description": "Add validation" }` | `201` Task; starts as `todo`, unassigned, without a due date. Description may be omitted. |
+| `GET /projects/:projectId/tasks` | Member | Optional `status`, plus list pagination | `200` paginated Tasks in the project, filtered before counting/paging. |
+| `GET /tasks/:taskId` | Member | None | `200` Task. |
+| `PATCH /tasks/:taskId` | Member | Any nonempty subset of `title`, `description`, `status`, `dueDate` | `200` updated Task; `description: ""` clears the description. |
+| `PUT /tasks/:taskId/assignee` | Member | `{ "assigneeId": "<member UUID>" }` or `{ "assigneeId": null }` | `200` Task plus assignment delivery metadata described below. |
+| `DELETE /tasks/:taskId` | Member | None | `204`; delete comments and clear linked notification task IDs. |
+| `GET /tasks/:taskId/comments` | Member | List pagination | `200` paginated Comments. |
+| `POST /tasks/:taskId/comments` | Member | `{ "body": "Signup validation is ready." }` | `201` Comment authored by the caller. |
+
+Assignment checks the project's workspace and the assignee's membership inside the coordinated mutation transaction. A nonmember assignee returns `400 ASSIGNEE_NOT_MEMBER`. `assigneeId` cannot be set through the general task patch; the dedicated route owns notification/email side effects.
+
+Changing to a different non-null assignee creates one in-app notification. Repeating the current assignment is a no-op with no new notification/email. Clearing the assignee sends neither. The transaction must coordinate concurrent assignment and member-removal requests as described in section 8.4.
+
+For a saved assignment, `meta.emailStatus` communicates the email attempt:
+
+| Value | Meaning |
+| --- | --- |
+| `accepted` | In V1/V2, the synchronous provider accepted the email; inbox delivery is not being claimed. |
+| `failed` | The email attempt or, during early V3 experiments, publication definitely failed. The assignment is already saved. |
+| `unknown` | A timeout/disconnection leaves the external outcome uncertain. The assignment is already saved. |
+| `pending` | In final V3, the outbox event committed and the worker will process it, including after broker recovery. |
+| `not_required` | The assignee was unchanged or cleared, so no email was requested. |
+
+A synchronous email failure after commit returns the saved Task with `200` and `meta.warning`, such as "Task saved; email could not be sent." The UI shows the saved assignment and warning without automatically repeating the mutation. Validation/transaction failures still return an error without claiming success. Keep provider failures/timeouts as separate metrics even when the assignment's HTTP response is `200`.
+
+Phase 9's direct-publish experiment must label successful-but-unconfirmed publication as `unknown`, rather than claiming durable delivery. Its loss/retry gaps are recorded in experiments. Final V3 reports `pending` after the outbox commit; HTTP success does not wait for the worker or provider.
+
+### 9.6 Notifications
+
+| Method and path | Access | Request | Success |
+| --- | --- | --- | --- |
+| `GET /notifications` | Signed-in recipient | List pagination; no body | `200` paginated Notifications belonging only to the caller. |
+| `PATCH /notifications/:notificationId/read` | Notification recipient | No body | `200` Notification with `readAt` set by the server. |
+
+Marking an already-read notification is a no-op and retains its first read timestamp. Another user's notification returns `404`. After a task is deleted, its notification can remain with `taskId: null`; the UI must not show a link to a missing task. Reading a notification does not grant access to its linked task.
+
+### 9.7 Resource shapes and error cases
+
+The named success objects above have these fields; nullable values use JSON null. Fields and references follow section 8.
+
+| Object | Response fields |
+| --- | --- |
+| Profile | `id`, `email`, `displayName`, `createdAt`, `updatedAt` |
+| Workspace | `id`, `name`, `ownerId`, `createdAt`, `updatedAt` |
+| Membership | `workspaceId`, `userId`, `joinedAt`, `user: { id, email, displayName }` |
+| Project | `id`, `workspaceId`, `name`, `createdBy`, `createdAt`, `updatedAt` |
+| Dashboard | `projectId`, `taskCount`, `taskCounts: { todo, in_progress, done }` |
+| Task | `id`, `projectId`, `title`, `description`, `status`, `assigneeId`, `dueDate`, `createdBy`, `createdAt`, `updatedAt` |
+| Comment | `id`, `taskId`, `authorId`, `body`, `createdAt` |
+| Notification | `id`, `recipientId`, `taskId`, `type`, `message`, `readAt`, `createdAt` |
+
+Errors use `{ "error": { "code": "VALIDATION_ERROR", "message": "Check the submitted fields.", "fields": { "title": "Title is required." } } }`. The optional `fields` map is for validation; messages must not expose tokens, SQL or private provider details.
+
+| HTTP status | Meaning / examples |
+| --- | --- |
+| `400` | `VALIDATION_ERROR`, `ASSIGNEE_NOT_MEMBER`; invalid body, UUID, status, date or pagination. |
+| `401` | `UNAUTHENTICATED`; missing, invalid or expired access token. |
+| `403` | `FORBIDDEN`; a workspace member attempts an owner-only operation. |
+| `404` | `NOT_FOUND`; missing or inaccessible resource. `USER_NOT_FOUND` is only for an authorized owner's invite lookup. |
+| `409` | `ALREADY_MEMBER`, `OWNER_REMOVAL_NOT_ALLOWED`, `PROFILE_NOT_READY`; the requested operation conflicts with current state. |
+| `429` | `RATE_LIMITED` once Redis rate limiting is introduced; include `Retry-After` in seconds. |
+| `500` | `INTERNAL_ERROR`; unexpected server failure. |
+| `503` | `DEPENDENCY_UNAVAILABLE`; required database/Auth dependency is unavailable, rather than a token being rejected as invalid. |
+
+V2 rate limiting applies to the selected authenticated Express routes using the verified user ID; Supabase's direct Auth endpoints retain the provider's own controls. Cache outages follow the fallback plan instead of automatically becoming `503`. An unexpected disconnect around a database commit can leave its outcome uncertain; a generic error must not promise rollback unless it is known. Re-read current state before retrying an uncertain mutation.
+
+### 9.8 Request and response examples
+
+Create a workspace after signing in and syncing the profile:
+
+```http
+POST /api/v1/workspaces
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{ "name": "Engineering" }
+```
+
+```json
+{
+  "data": {
+    "id": "11111111-1111-4111-8111-111111111111",
+    "name": "Engineering",
+    "ownerId": "22222222-2222-4222-8222-222222222222",
+    "createdAt": "2026-10-16T10:00:00.000Z",
+    "updatedAt": "2026-10-16T10:00:00.000Z"
+  }
+}
+```
+
+Success is `201`. List that workspace's projects with `GET /api/v1/workspaces/11111111-1111-4111-8111-111111111111/projects?page=1&limit=20`. An empty authorized list is:
+
+```json
+{ "data": [], "meta": { "page": 1, "limit": 20, "total": 0 } }
+```
+
+Update a task using its actual ID from a create/list response:
+
+```http
+PATCH /api/v1/tasks/<taskId>
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{ "status": "in_progress", "dueDate": "2026-10-30" }
+```
+
+Success is `200` with the complete Task object described above. Assignment uses `PUT /api/v1/tasks/<taskId>/assignee` with `{ "assigneeId": "<member UUID>" }`; final V3 returns the updated Task in `data` and `{ "emailStatus": "pending" }` in `meta`.
+
+An invalid title receives `400`, for example:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Check the submitted fields.",
+    "fields": { "title": "Title is required." }
+  }
+}
+```
+
+### 9.9 User-flow walkthrough and acceptance
+
+Use IDs returned by preceding requests. These are planned checks for implementation; no running API is claimed here.
+
+1. **Authentication (Phase 1):** Sign up two users through Supabase; confirm email if required. Log in each, call `POST /auth/sync`, then `GET /me`. Refresh a page and check session restoration. Repeat a protected request without a token and expect `401`. Log out and confirm the frontend requires login again.
+2. **Workspace (Phase 2):** As the owner, `POST /workspaces`, then `GET /workspaces` and `GET /workspaces/:workspaceId`. Add the second profile using `POST /workspaces/:workspaceId/members`; both should appear in the member list. Repeat the add and expect `409`. Rename as owner (`200`); rename as the other member (`403`).
+3. **Project (Phase 3):** As a member, create a project under the workspace (`201`), list it and open it (`200`), then rename it (`200`). An unrelated third user's requests for that project receive `404`.
+4. **Task and comment (Phase 4):** Create a task (`201`), open it, edit its description/date/status (`200`) and filter the project list by that status. Assign the second member (`200`), then post a comment (`201`) and reload comments. A nonmember assignee is rejected (`400`).
+5. **Notifications and email (Phase 5):** Once the notification/email tasks are implemented, make a new assignment to another member. As its recipient, list notifications and mark it read (`200`). Another user's read attempt receives `404`. Check the test inbox; stop the provider and confirm saved assignment plus email failure/uncertainty is reported accurately.
+6. **Deletion and removal:** Cancel a UI delete confirmation and confirm no DELETE request is sent. Confirm deletion of a task/project and expect `204` plus the ERD's cascading/nulling behavior. Remove a nonowner member (`204`) and confirm their workspace access becomes `404` and their assignments are cleared. Attempt owner removal and expect `409`.
+7. **V2/V3:** Read the project dashboard with the same contract across versions. After membership removal, a previously cached response must remain inaccessible. In final V3, stop RabbitMQ, assign a task, and expect a saved Task with pending outbox delivery; after recovery the worker processes the event.
+
+Task **0.4** is accepted when every planned user action maps to its provider call or application route, request/response shape, permission and failure behavior. Exact experiment commands and measurements are completed in task **0.6**.
+
+**Interview explanation:** REST endpoints resources ko represent karte hain. Authentication user identify karti hai; authorization workspace mein permission check karti hai. Response saved task aur email delivery ka status clearly batata hai. Redis aur RabbitMQ internal processing change karte hain, jabke frontend ka main resource contract consistent rehta hai.
