@@ -29,7 +29,7 @@ This is the full roadmap for task **0.5**, based on [checklist.md](../checklist.
 - [Architecture diagrams](architecture.md#2-versioned-high-level-design).
 - [Database ERD](architecture.md#8-postgresql-database-erd).
 - [API endpoints and user flows](architecture.md#9-api-endpoints-and-user-flows).
-- `docs/experiments.md` will be prepared in task **0.6**, with exact reproduction commands, observations, measurements and results.
+- [Experiment plan](experiments.md) defines planned reproduction commands, observations, measurements and results records; scripts become runnable in their listed implementation tasks.
 
 Before V2, reproduce the repeated-read problem in V1. Before V3, reproduce synchronous email delays and unavailable-provider outcomes. In early V3, demonstrate event loss and redelivery risks before introducing the reliability fixes. Infrastructure choices need measured benefits and explained trade-offs.
 
@@ -50,7 +50,7 @@ Planning comes first. Complete the planning tasks and obtain approval before the
   - Test: Walk through signup to assignment, comment and notification using the endpoint plan. Acceptance: Methods, paths, auth, permissions, request/response examples and error cases are documented in docs/architecture.md.
 - [x] **0.5** Write the complete V1/V2/V3 roadmap in docs/roadmap.md
   - Test: Compare the roadmap against all checklist phases. Acceptance: Every task has a small scope, a simple test and acceptance criteria.
-- [ ] **0.6** Plan reproducible Redis and RabbitMQ experiments in docs/experiments.md
+- [x] **0.6** Plan reproducible Redis and RabbitMQ experiments in docs/experiments.md
   - Test: Review commands, inputs, expected observations and metrics for each experiment. Acceptance: The plan demonstrates caching problems, synchronous email delays and unreliable operations before infrastructure changes.
 - [ ] **0.7** Present the architecture and proposed file structure for planning approval
   - Test: Review README.md and the three planned docs files together. Acceptance: The user approves planning before setup or implementation starts.

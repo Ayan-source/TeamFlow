@@ -8,6 +8,7 @@
 - Phase 0, task 0.3: done. Added the database ERD, table fields, keys, membership and deletion rules, and planned V3 reliability tables in docs/architecture.md.
 - Phase 0, task 0.4: done. Added API endpoints, permissions, request/response examples, errors and user flows in docs/architecture.md.
 - Phase 0, task 0.5: done. Added docs/roadmap.md with all 108 checklist tasks, matching IDs/checks and version milestones.
+- Phase 0, task 0.6: done. Added the experiment plan with planned commands, expected observations, measurements and recovery checks. Experiments have not run yet.
 - Phase 0, task 0.8: partial. GitHub setup is done; project folders are pending planning approval.
 
-Next task: 0.6 — Plan reproducible Redis and RabbitMQ experiments.
+Next task: 0.7 — Review the architecture and proposed file structure; continue through 0.9 as authorized.
