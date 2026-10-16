@@ -10,6 +10,6 @@
 - Phase 0, task 0.5: done. Added docs/roadmap.md with all 108 checklist tasks, matching IDs/checks and version milestones.
 - Phase 0, task 0.6: done. Added the experiment plan with planned commands, expected observations, measurements and recovery checks. Experiments have not run yet.
 - Phase 0, task 0.7: done. Recorded the architecture review and apps/web + apps/api structure. User authorized setup through 0.9 without stopping.
-- Phase 0, task 0.8: partial. GitHub setup is done; project folders are pending planning approval.
+- Phase 0, task 0.8: done. GitHub is connected and the approved apps/web/src/app and apps/api/src folders are tracked.
 
-Next task: 0.8 — Set up the approved project folders.
+Next task: 0.9 — Set up Next.js, Express and TypeScript.

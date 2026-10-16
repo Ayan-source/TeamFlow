@@ -38,7 +38,7 @@ The checks below describe each task's acceptance; unchecked tasks have not been 
 ## Phase 0 — Planning & setup
 Planning comes first. Complete the planning tasks and obtain approval before the setup tasks below; no feature implementation in this phase.
 
-**Phase goal:** Prepare and review the planning documents, then complete the approved local setup. Tasks 0.1–0.7 are planning; tasks 0.8–0.13 are setup after approval. GitHub initialization is already done, but task 0.8 stays unchecked until the approved folders are ready.
+**Phase goal:** Prepare and review the planning documents, then complete the approved local setup. Tasks 0.1–0.7 are planning; tasks 0.8–0.13 are setup after approval. GitHub initialization was completed first; task 0.8 also includes the approved project folders.
 
 - [x] **0.1** Write a simple project overview and MVP scope
   - Test: Read the overview as a new user. Acceptance: README.md explains what users can do and the V1 scope.
@@ -54,7 +54,7 @@ Planning comes first. Complete the planning tasks and obtain approval before the
   - Test: Review commands, inputs, expected observations and metrics for each experiment. Acceptance: The plan demonstrates caching problems, synchronous email delays and unreliable operations before infrastructure changes.
 - [x] **0.7** Present the architecture and proposed file structure for planning approval
   - Test: Review README.md and the three planned docs files together. Acceptance: The user approves planning before setup or implementation starts.
-- [ ] **0.8** Set up GitHub repository and project folders
+- [x] **0.8** Set up GitHub repository and project folders
   - Test: Inspect the remote, branch, folder structure and ignore rules. Acceptance: The approved structure exists and credentials are excluded from Git.
 - [ ] **0.9** Set up Next.js, Express and TypeScript
   - Test: Start frontend and backend using documented commands. Acceptance: Both start successfully with TypeScript and Tailwind CSS configured for the frontend.
