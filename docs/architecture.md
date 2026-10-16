@@ -1,139 +1,270 @@
-# TeamFlow architecture
+# TeamFlow — Architecture and data flow plan
 
-Task **0.2**: High-Level Design (HLD) diagrams for the three versions of the same application, written as plain text in Markdown. These are planned designs; infrastructure is introduced only in its assigned version.
+This is the Phase 0 HLD for task **0.2**. It describes the planned components, their responsibilities, how requests move, and how failures recover. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
 
-HLD ka matlab hai system ke main parts aur unke connections dekhna. Detailed database relationships and API endpoints will be added in tasks **0.3** and **0.4**.
+HLD mein hum system ke main parts, unki responsibility aur unke connections samajhte hain. Database ERD is task **0.3**; API endpoints are task **0.4**.
 
-## Shared design
+## 1. System context and ownership
 
-- Next.js, TypeScript and Tailwind CSS provide the user interface.
-- Supabase Auth handles signup, login and sessions. The frontend sends its access token with protected API requests.
-- The Express API verifies the token and checks workspace membership and permissions before accessing application data. A cache hit must also pass these checks.
-- Prisma runs application database queries against Supabase PostgreSQL. Database credentials stay on the backend.
-- PostgreSQL stores users' application data: workspaces, memberships, projects, tasks, comments and notifications. Supabase Auth owns authentication identities.
-- The same application grows through V1, V2 and V3. The worker is a separate Node.js process in the same project, with shared event definitions and database schema.
-- Docker Compose will run the approved local processes. Supabase PostgreSQL and Auth remain hosted services. Redis joins in V2; RabbitMQ and the worker join in V3.
+A team member uses the Next.js frontend to work with workspaces, projects, tasks, comments and notifications. Supabase Auth identifies the user; the Express API decides whether that user may perform an action.
 
-## V1 — Working application and baseline
+| Component | Responsibility | Introduced |
+| --- | --- | --- |
+| Next.js frontend | Forms, pages, session handling and API requests | V1 |
+| Supabase Auth | Signup, login and authentication identities | V1 |
+| Express API | Token verification, input validation, workspace permissions and business rules | V1 |
+| Prisma | Database queries and transactions inside the API and, later, worker | V1 |
+| Supabase PostgreSQL | Persistent application data and, later, outbox records | V1 |
+| Test email provider | Receive assignment emails during development | V1 |
+| Redis | Cached dashboard reads and shared rate-limit counters | V2 |
+| RabbitMQ | Exchange, routing, email queue, retries and dead-letter queue | V3 |
+| Node.js worker | Outbox publishing and background email processing | V3 |
 
-```text
-[Team member]
-      |
-      v
-[Next.js frontend] <---- signup / login ----> [Supabase Auth]
-      |
-      | HTTPS request with access token
-      v
-[Express API: verify token, check permissions, use Prisma]
-      |
-      +---- reads / writes ----> [Supabase PostgreSQL]
-      |
-      +---- synchronous email -> [Test email provider]
-                                 Request waits for email attempt.
-```
+Workspaces, projects, tasks, comments and notifications are responsibilities inside one Express application. The worker is another process from the same project, using the same database and event definitions.
 
-**Request flow:** A member signs in, opens a project and assigns a task. The API checks access, saves the assignment and notification in PostgreSQL, and attempts the email synchronously. The request waits for the email attempt to finish.
+Frontend route guards improve navigation; the API still verifies every protected request. Database and provider credentials stay on the backend.
 
-**Simple explanation:** V1 mein har read PostgreSQL se hoti hai. Assignment email bhejne ka wait bhi request ke andar hota hai. Provider slow ho to user ko response late mil sakta hai.
+## 2. Versioned high-level design
 
-**Limits to observe:** Repeated dashboard reads may repeat expensive database queries. A slow or unavailable email provider affects the request; an application crash after saving an assignment can leave its email unsent. We will record the actual response and database state during failures.
-
-**Measurements:** Record request p50/p95 latency, errors, throughput, database query counts and database load. Compare assignment requests with and without synchronous email sending.
-
-## V2 — Redis caching and rate limiting
+### 2.1 V1 — PostgreSQL application
 
 ```text
-[Team member]
-      |
-      v
-[Next.js frontend] <---- signup / login ----> [Supabase Auth]
-      |
-      | HTTPS request with access token
-      v
-[Express API: verify token, check permissions, use Prisma]
-      |
-      +---- cache lookup / populate ------> [Redis]
-      |     TTL, invalidation, rate limits
-      |
-      +---- writes / cache miss ----------> [Supabase PostgreSQL]
-      |     Also used when cache is unavailable.
-      |
-      +---- synchronous email ------------> [Test email provider]
++--------------------------------+       +------------------------+
+| Browser: Next.js frontend      | <---> | Supabase Auth          |
+| Pages, forms and session       | login | Signup and login       |
++--------------------------------+       +------------------------+
+                |
+                | HTTPS request + access token
+                v
++-----------------------------------------------------------------+
+| Express API - one application                                   |
+|                                                                 |
+| Verify token -> validate input -> check workspace permission    |
+| Workspaces | Projects | Tasks | Comments | Notifications        |
+| Prisma transactions | Synchronous email                         |
++-----------------------------------------------------------------+
+                |                                     |
+       Prisma read / write                Wait for email attempt
+                v                                     v
++--------------------------------+       +------------------------+
+| Supabase PostgreSQL            |       | Test email provider    |
+| Persistent application data    |       | Assignment emails      |
++--------------------------------+       +------------------------+
 ```
 
-**Cache-aside flow:** After checking permission, the API looks for the workspace-scoped dashboard key in Redis. On a hit, it returns the cached result. On a miss, it reads PostgreSQL and caches the result with a TTL. Task changes invalidate affected dashboard entries after the database write succeeds.
+The API verifies the token through the Supabase Auth integration before applying workspace permissions. Application reads go to PostgreSQL. Assignment requests save the task change and in-app notification, then attempt email before returning.
 
-**Simple explanation:** Redis frequently read data ki temporary copy rakhta hai. Cache miss par PostgreSQL se data lete hain; TTL batata hai copy kitni der valid rahegi. PostgreSQL application data ka source of truth rehta hai.
+**Learning goal:** Observe repeated database work and synchronous email delays in a working application. V1 mein pehle normal app banayenge aur actual problems measure karenge.
 
-**Failure behavior:** Cache operations have bounded timeouts. If Redis is unavailable, dashboard reads fall back to PostgreSQL. Recovery must avoid serving entries made stale by writes during the outage. Rate limiting needs its own documented failure policy; database fallback alone does not replace a rate limiter.
-
-**Limits to observe:** Invalidation adds work, cached data can become stale, and many simultaneous misses can overload PostgreSQL. Test isolation between workspaces and a stampede mitigation before judging the result.
-
-**Measurements:** Repeat the V1 dataset and workload with cold and warm caches. Compare p50/p95 latency, errors, database query counts/load and cache hits/misses. Test TTL expiry, invalidation, Redis outages and recovery.
-
-## V3 — RabbitMQ and reliable background email
-
-This diagram shows the final V3 design after the reliability tasks. In Phase 9, the API first publishes directly to RabbitMQ so we can observe the gap between saving data and publishing an event. In Phase 10, the transactional outbox replaces that direct publication path. The publisher and consumer run in a separate Node.js worker process; we can later run multiple instances.
+### 2.2 V2 — Add Redis
 
 ```text
-[Team member]
-      |
-      v
-[Next.js frontend] <---- signup / login ----> [Supabase Auth]
-      |
-      | HTTPS request with access token
-      v
-[Express API: verify token, check permissions, use Prisma]
-      |
-      +---- cache / rate limits ----------> [Redis]
-      |     Invalidate affected cache after database writes.
-      |
-      | Prisma reads and writes; cache miss or cache failure fallback
-      v
-[Supabase PostgreSQL]
-  Assignment + notification + outbox event saved in one transaction.
-      ^
-      | Read pending events; mark published after broker confirmation.
-      v
-[Outbox publisher - separate worker process]
-      |
-      | Publish event and wait for broker confirmation.
-      v
-[RabbitMQ exchange] -- routing key + binding --> [Email queue]
-                                                     |
-                                                     | Delivery
-                                                     v
-                              [Email consumer - worker process]
-                                    |
-                                    +--> [Test email provider]
-                                    |
-                                    +--> [PostgreSQL processed event IDs]
-                                    |    Guard against duplicate effects.
-                                    |
-                                    +--> [Retry queue] --> [Email queue]
-                                    |    Bounded retries with backoff.
-                                    |
-                                    +--> [Dead-letter queue]
-                                         Permanent / exhausted failures.
-
-Consumer sends ACK after success, or safely handles failure using NACK
-or a confirmed retry / dead-letter handoff. Unacknowledged work can return.
++--------------------------------+       +------------------------+
+| Browser: Next.js frontend      | <---> | Supabase Auth          |
+| Pages, forms and session       | login | Signup and login       |
++--------------------------------+       +------------------------+
+                |
+                | HTTPS request + access token
+                v
++-----------------------------------------------------------------+
+| Express API - same application                                  |
+| Token checks | Validation | Workspace permissions               |
+| Prisma | Cache-aside | Invalidation | Rate limiting             |
++-----------------------------------------------------------------+
+          |                         |                      |
+    Cache / TTL              Writes / reads          Sync email
+    Rate limits              Miss / outage
+          v                         v                      v
++-------------------+   +------------------------+   +------------+
+| Redis             |   | Supabase PostgreSQL    |   | Test email |
+| Temporary cache   |   | Authoritative data     |   | provider   |
+| Rate-limit state  |   |                        |   |            |
++-------------------+   +------------------------+   +------------+
 ```
 
-**Request flow:** The API checks access and saves the assignment, in-app notification and outbox event in one PostgreSQL transaction. It returns after the database work and bounded cache handling, without waiting for email delivery. Notifications remain available in the app while email processing catches up.
+Authorization happens before cached data is returned. The API uses Redis for selected reads and rate limiting; PostgreSQL continues to store the application data. Emails still run synchronously.
 
-**Outbox flow:** A publisher loop in the separate worker reads pending outbox events, publishes them with routing information, waits for broker confirmation, and records publication progress. If RabbitMQ is down, the event stays pending for a later attempt. Multiple publisher loops must coordinate claims so worker scaling does not create uncontrolled publication races.
+**Learning goal:** Measure whether Redis reduces the observed repeated-read cost, then test expiry, invalidation, simultaneous misses and outages.
 
-**Consumer flow:** The email consumer processes the event, uses its event ID to guard database effects, and acknowledges successful work. Transient failures use bounded retries with backoff; permanent or exhausted failures go to a dead-letter queue. A failure is acknowledged only after its retry or dead-letter handoff is safely confirmed, or it is NACKed/rejected using configured broker routing. A worker crash before acknowledgement allows redelivery.
+### 2.3 V3 — Add RabbitMQ and a separate worker
 
-**Simple explanation:** Queue mein email ka kaam rakh dete hain, worker usay baad mein karta hai. Outbox database mein pending event save karta hai, taa ke database commit ke baad broker unavailable ho to event recover ho sake. ACK ka matlab processing successful; NACK ka matlab failure ko retry ya rejection policy ke mutabiq handle karna.
+```text
++--------------------------------+       +------------------------+
+| Browser: Next.js frontend      | <---> | Supabase Auth          |
+| Pages, forms and session       | login | Signup and login       |
++--------------------------------+       +------------------------+
+                |
+                | HTTPS request + access token
+                v
++-----------------------------------+     +-----------------------+
+| Express API - same application    | <-> | Redis                 |
+| Permissions | Prisma transactions |     | Cache and rate limits |
++-----------------------------------+     +-----------------------+
+                |
+                | Reads and writes; assignment + notification + outbox
+                | saved in one transaction.
+                v
++-----------------------------------------------------------------+
+| Supabase PostgreSQL                                             |
+| Application data | Outbox events | Processing records           |
++-----------------------------------------------------------------+
+                ^
+                | Claim pending events; record confirmed publication.
+                v
++-----------------------------------------------------------------+
+| Separate Node.js worker process                                 |
+| Outbox publisher loop                                           |
++-----------------------------------------------------------------+
+                |
+                | Publish event; wait for broker confirmation.
+                v
++-----------------------------------------------------------------+
+| RabbitMQ                                                        |
+| Task events exchange -> routing key + binding -> Email queue    |
+| Retry queues | Dead-letter queue                                |
++-----------------------------------------------------------------+
+                |
+                | Deliver event; worker ACKs successful processing.
+                v
++-----------------------------------------------------------------+
+| Separate Node.js worker process                                 |
+| Email consumer loop | Idempotency | Bounded retry handling      |
++-----------------------------------------------------------------+
+                |
+                v
++--------------------------------+
+| Test email provider            |
++--------------------------------+
+```
 
-**Delivery limits:** Redelivery and duplicate publication are possible, including a crash after broker confirmation but before outbox progress is saved. Processing must be idempotent. An email provider may accept an email just before the worker crashes; a database record alone cannot guarantee exactly one external email. Use provider idempotency if available and document remaining duplicate-email risk.
+The two worker boxes show responsibilities in the same separate Node.js process. Later, multiple instances of that process can share the workload. The consumer also accesses PostgreSQL for processing records.
 
-**Measurements:** Compare HTTP request latency against synchronous V1/V2 email processing using the same workload. Also measure email completion time, queue depth, retry/dead-letter counts and worker throughput. Run broker outages, worker crashes and duplicate deliveries; then compare one worker with multiple workers under the same provider limits.
+This is the final V3 design after reliability work. Phase 9 starts with direct API publication to RabbitMQ so we can observe the database/publish gap. Phase 10 replaces that path with the transactional outbox shown above.
 
-## How to review this task
+**Learning goal:** Reduce request time spent waiting for email while making committed work recoverable after failures. Queue mein email ka kaam worker ko milta hai; API ko email delivery ka wait nahi karna padta.
 
-Open this file in a text editor, a Markdown preview or GitHub. The three text diagrams should be readable with their spacing preserved. Trace login, authorized database reads and assignment email delivery through each version. Confirm that V1 uses PostgreSQL, V2 adds Redis, and V3 adds RabbitMQ with a separate worker and the final outbox flow.
+## 3. Request flow and workspace isolation
 
-**Interview explanation:** Pehle working PostgreSQL app banayi aur baseline measure ki. Repeated reads costly hon to Redis evaluate karenge. Slow ya unreliable email processing ke liye RabbitMQ worker use karenge, aur retries, idempotency aur outbox se failure handling improve karenge. Har addition ka benefit measurements se explain karna hai.
+### Sign in and open a project
+
+```text
+Member -> Next.js -> Supabase Auth -> Session/access token
+
+Next.js -> Express API: protected request + access token
+API     -> Auth integration: verify token
+API     -> PostgreSQL: check workspace membership and resource ownership
+API     -> PostgreSQL or authorized cache: fetch requested data
+API     -> Next.js: result or a clear authentication/permission error
+```
+
+The API derives the user from the verified token. It checks that the requested project or task belongs to a workspace the user can access. A caller-supplied user or workspace ID is never enough to grant access.
+
+### Assign a task
+
+```text
+Member -> Frontend -> API
+                       |
+                       +-> Verify user and workspace access
+                       +-> Confirm assignee belongs to the workspace
+                       +-> V1/V2: save assignment and notification
+                       |          Invalidate affected cache in V2.
+                       |          Attempt synchronous email; return response.
+                       |
+                       +-> Final V3: one transaction saves assignment,
+                                     notification and outbox event.
+                                     Invalidate cache; return response.
+                                     Worker sends the email later.
+```
+
+In final V3, the assignment, notification and outbox event commit together. The API returns after the database work and bounded cache handling. A successful assignment response confirms the saved change; it does not claim the email has already arrived.
+
+## 4. Redis caching and rate limiting
+
+```text
+Authorized dashboard read
+          |
+          v
+    Look up Redis key
+          |
+          +--- HIT ----------------------> Return cached result
+          |
+          +--- MISS ---> Read PostgreSQL -> Cache with TTL -> Return result
+          |
+          +--- TIMEOUT / UNAVAILABLE ----> Read PostgreSQL -> Return result
+
+Successful task write -> Invalidate affected dashboard cache entries
+```
+
+Keys include the workspace and resource identity, plus any parameters that change the result. TTL limits how long entries live. Mutations invalidate affected entries after the database commit. Recovery must prevent entries made stale during an outage from being served again.
+
+Rate limiting uses separate Redis counters with an explicit window. Concurrent increments and reset behavior must be checked. Its outage policy is a separate decision; falling back to PostgreSQL for dashboard reads does not replace the limiter.
+
+A burst of misses can cause a cache stampede. We will reproduce it and choose a small mitigation based on evidence. Cache invalidation also has race conditions that must be covered by the implementation checks.
+
+**Simple explanation:** Redis data ki temporary copy rakhta hai. Miss ya outage par original data PostgreSQL se milta hai. Faster responses ka benefit measured workload se prove karna hai.
+
+## 5. Assignment events, routing and transactional outbox
+
+```text
+API -> PostgreSQL transaction:
+       Update assignment + create notification + insert outbox event
+                           |
+                         COMMIT
+                           |
+Worker publisher -> Claim pending outbox event
+                 -> Publish to task events exchange
+                 -> Wait for RabbitMQ publisher confirmation
+                 -> Mark publication progress in PostgreSQL
+
+Exchange -- routing key + binding --> Email queue
+                                         |
+                                         v
+                          Worker consumer: check event ID,
+                          attempt email if not completed
+                                         |
+                     +-------------------+----------------------+
+                     |                   |                      |
+                  SUCCESS          TRANSIENT FAILURE       PERMANENT /
+                     |                   |                RETRIES EXHAUSTED
+                     v                   v                      |
+               Record result      Retry queue                   v
+               ACK                Bounded backoff        Dead-letter queue
+                                  Return to email queue
+```
+
+The consumer checks the event ID before repeating completed processing. Publisher confirms mean the broker accepted a publication; they do not mean an email was delivered. Worker instances coordinate outbox claims through PostgreSQL.
+
+ACK follows successful processing. For failures, either use the configured NACK/reject routing or confirm the retry/dead-letter handoff before acknowledging the original message. Unacknowledged work can be redelivered after a crash.
+
+A crash after publication but before recording progress can publish the same event twice. A unique event ID and idempotent processing handle duplicate database effects. A provider may accept an email just before a crash; exactly one external email requires provider idempotency support, otherwise duplicate-email risk remains.
+
+**Simple explanation:** Outbox pending event ko database mein rakhta hai. Broker down ho to event baad mein publish ho sakta hai. Idempotency ka matlab same event dobara aaye to completed database effect repeat na ho.
+
+## 6. Failure and recovery
+
+| Failure | Expected behavior | What we inspect |
+| --- | --- | --- |
+| PostgreSQL unavailable | Requests needing it fail clearly; no false success. An uncommitted assignment transaction rolls back. | HTTP result, logs and persisted state |
+| Redis unavailable | Cache reads use bounded timeouts and fall back to PostgreSQL. Rate-limit behavior follows its chosen policy. | Request latency, errors and recovery freshness |
+| Email provider slow or unavailable in V1/V2 | The synchronous request is affected; a previously committed assignment may still exist. | Response time, saved assignment/notification and email outcome |
+| RabbitMQ unavailable in final V3 | Committed outbox events remain pending and are published after recovery. | Outbox backlog and confirmed publications |
+| Worker crashes before ACK | Unacknowledged work is redelivered; event IDs guard completed processing. | Redelivery and duplicate effects |
+| Email keeps failing in V3 | Bounded retries end in the dead-letter queue. | Attempts, queue depth and diagnostic context |
+
+Failures must be reproduced before judging the improvement. Exact commands, expected observations and measured results belong in task **0.6**, the experiment plan.
+
+## 7. Runtime, measurements and review
+
+Docker Compose will run the approved local processes: frontend/API in V1, Redis in V2, and RabbitMQ plus the separate worker in V3. Supabase PostgreSQL and Auth remain hosted services. Deployment providers and worker hosting will be chosen in the deployment task.
+
+Compare versions using the same dataset and workload. Record p50/p95 request latency, errors, throughput and database query/load metrics; add cache hits/misses in V2 and queue depth, delivery time, retries and worker throughput in V3.
+
+To review this HLD:
+
+1. Open this Markdown file in an editor or on GitHub; the boxed diagrams should retain their spacing.
+2. Trace a signed-in member through the UI, permission check and database read in each version.
+3. Trace an assignment through its notification and email path.
+4. Check the Redis miss/outage path and the V3 broker/worker recovery paths.
+5. Confirm the version boundaries: PostgreSQL in V1, Redis in V2, RabbitMQ and a separate worker in V3.
+
+**Interview explanation:** Pehle PostgreSQL app ka baseline measure karenge. Repeated reads costly hon to Redis evaluate karenge. Slow ya unreliable email processing ke liye RabbitMQ worker, retries, idempotency aur outbox use karenge. Har decision ka benefit aur cost measurements se explain karenge.
