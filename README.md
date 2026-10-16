@@ -46,7 +46,7 @@ Redis starts in V2 and RabbitMQ starts in V3. Record comparable measurements and
 
 ## Project status and setup
 
-The Phase 0 planning documents are ready. The GitHub repository is connected, and the user authorized the basic folder/application setup through task 0.9. Application setup commands will be added with the scaffold.
+Tasks 0.1–0.9 are complete. The basic frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Database integration is task 0.10.
 
 - [checklist.md](checklist.md): numbered tasks, test steps and acceptance criteria.
 - [docs/roadmap.md](docs/roadmap.md): the complete V1/V2/V3 plan using the same task IDs and completion status.
@@ -56,4 +56,41 @@ The Phase 0 planning documents are ready. The GitHub repository is connected, an
 
 The architecture document contains the [V1/V2/V3 HLD diagrams](docs/architecture.md#2-versioned-high-level-design), [PostgreSQL ERD](docs/architecture.md#8-postgresql-database-erd), and [API endpoints and user flows](docs/architecture.md#9-api-endpoints-and-user-flows). The [implementation roadmap](docs/roadmap.md) covers all phases; the [experiment plan](docs/experiments.md) defines how to demonstrate problems and measure changes.
 
-The [architecture and folder review](docs/architecture.md#10-architecture-review-and-project-structure) records the proposed setup. Each task is checked, recorded, committed and pushed separately. Work is currently authorized through task 0.9; afterward it stops for review.
+The [architecture and folder review](docs/architecture.md#10-architecture-review-and-project-structure) records the setup. Each task is checked, recorded, committed and pushed separately. The authorized work through task 0.9 is complete and waiting for review.
+
+## Local development
+
+Requirements: Node.js 22.16 or newer and npm 10 or newer. Run commands from the repository root. One root lockfile manages both workspaces.
+
+Install the locked dependencies:
+
+```powershell
+npm ci
+```
+
+Start the frontend in one terminal:
+
+```powershell
+npm run dev:web
+```
+
+Open [TeamFlow](http://127.0.0.1:3000). The initial page uses Tailwind CSS.
+
+Start the API in another terminal:
+
+```powershell
+npm run dev:api
+```
+
+The API listens at `http://127.0.0.1:3001` and prints its startup message. At this scaffold stage, `GET /` returns Express's default `404`; the health endpoint is added in task 0.11 and resource endpoints follow their roadmap tasks. Use Ctrl+C in each terminal to stop its server.
+
+## Build and TypeScript checks
+
+```powershell
+npm run typecheck
+npm run build
+```
+
+After building, use `npm run start:web` and `npm run start:api` in separate terminals to start the production builds. The development and production scripts use the same default ports, so stop the development servers first. Set `PORT` for the API if a different port is needed.
+
+`node_modules`, `.next`, API `dist` output and generated Next.js type files stay local and ignored. Commit package manifests and the root lockfile when dependencies change.

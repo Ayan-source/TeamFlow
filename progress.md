@@ -11,5 +11,6 @@
 - Phase 0, task 0.6: done. Added the experiment plan with planned commands, expected observations, measurements and recovery checks. Experiments have not run yet.
 - Phase 0, task 0.7: done. Recorded the architecture review and apps/web + apps/api structure. User authorized setup through 0.9 without stopping.
 - Phase 0, task 0.8: done. GitHub is connected and the approved apps/web/src/app and apps/api/src folders are tracked.
+- Phase 0, task 0.9: done. Added Next.js/Tailwind frontend, Express TypeScript API, npm workspaces and setup commands. Type checks, both builds and local startup/HTTP checks passed.
 
-Next task: 0.9 — Set up Next.js, Express and TypeScript.
+Next task: 0.10 — Connect Supabase PostgreSQL using Prisma. Waiting for review after the authorized work through 0.9.

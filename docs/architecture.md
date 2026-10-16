@@ -663,6 +663,7 @@ TeamFlow/
 |   |   |   |-- globals.css
 |   |   |   |-- layout.tsx
 |   |   |   `-- page.tsx
+|   |   |-- AGENTS.md
 |   |   |-- package.json
 |   |   |-- postcss.config.mjs
 |   |   `-- tsconfig.json
@@ -684,7 +685,7 @@ TeamFlow/
 prompt.md stays local and ignored. Build output and node_modules are ignored.
 ```
 
-The folders are created in task 0.8 and populated in 0.9. Next.js-generated type files are local build support; their ignore behavior is documented in the scaffold. Future folders such as `apps/api/prisma`, `experiments/k6` and `apps/worker` are introduced only when required.
+The folders are created in task 0.8 and populated in 0.9. Next.js-generated type files are local build support and stay ignored. Next.js also maintains `apps/web/AGENTS.md` with guidance for the installed version; that guide is tracked so normal startup does not leave an uncommitted generated document. Future folders such as `apps/api/prisma`, `experiments/k6` and `apps/worker` are introduced only when required.
 
 ### 10.3 Review outcome and authorization
 
