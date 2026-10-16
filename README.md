@@ -46,7 +46,7 @@ Redis starts in V2 and RabbitMQ starts in V3. Record comparable measurements and
 
 ## Project status and setup
 
-Phase 0 planning is in progress. The GitHub repository and initial commit are ready. Application setup commands will be added as the approved setup tasks are completed.
+The Phase 0 planning documents are ready. The GitHub repository is connected, and the user authorized the basic folder/application setup through task 0.9. Application setup commands will be added with the scaffold.
 
 - [checklist.md](checklist.md): numbered tasks, test steps and acceptance criteria.
 - [docs/roadmap.md](docs/roadmap.md): the complete V1/V2/V3 plan using the same task IDs and completion status.
@@ -56,4 +56,4 @@ Phase 0 planning is in progress. The GitHub repository and initial commit are re
 
 The architecture document contains the [V1/V2/V3 HLD diagrams](docs/architecture.md#2-versioned-high-level-design), [PostgreSQL ERD](docs/architecture.md#8-postgresql-database-erd), and [API endpoints and user flows](docs/architecture.md#9-api-endpoints-and-user-flows). The [implementation roadmap](docs/roadmap.md) covers all phases; the [experiment plan](docs/experiments.md) defines how to demonstrate problems and measure changes.
 
-After the planning files are ready, review and approve the proposed architecture and folder structure before application setup begins. Each task is completed, checked, recorded, committed and pushed separately; the next task waits for review.
+The [architecture and folder review](docs/architecture.md#10-architecture-review-and-project-structure) records the proposed setup. Each task is checked, recorded, committed and pushed separately. Work is currently authorized through task 0.9; afterward it stops for review.

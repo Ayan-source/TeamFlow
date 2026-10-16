@@ -9,6 +9,7 @@
 - Phase 0, task 0.4: done. Added API endpoints, permissions, request/response examples, errors and user flows in docs/architecture.md.
 - Phase 0, task 0.5: done. Added docs/roadmap.md with all 108 checklist tasks, matching IDs/checks and version milestones.
 - Phase 0, task 0.6: done. Added the experiment plan with planned commands, expected observations, measurements and recovery checks. Experiments have not run yet.
+- Phase 0, task 0.7: done. Recorded the architecture review and apps/web + apps/api structure. User authorized setup through 0.9 without stopping.
 - Phase 0, task 0.8: partial. GitHub setup is done; project folders are pending planning approval.
 
-Next task: 0.7 — Review the architecture and proposed file structure; continue through 0.9 as authorized.
+Next task: 0.8 — Set up the approved project folders.

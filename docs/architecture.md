@@ -1,6 +1,6 @@
 # TeamFlow — Architecture and data flow plan
 
-This Phase 0 design contains the HLD for task **0.2**, database ERD for task **0.3**, and API plan for task **0.4**. It describes planned components, data relationships, request paths and failure recovery. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
+This Phase 0 design contains the HLD for task **0.2**, database ERD for task **0.3**, API plan for task **0.4**, and architecture/file-structure review for task **0.7**. PostgreSQL owns application data; Redis holds temporary copies; RabbitMQ delivers background work.
 
 HLD mein hum system ke main parts, unki responsibility aur unke connections samajhte hain. Section 8 contains the ERD; section 9 contains the API endpoints and user flows.
 
@@ -639,3 +639,57 @@ Use IDs returned by preceding requests. These are planned checks for implementat
 Task **0.4** is accepted when every planned user action maps to its provider call or application route, request/response shape, permission and failure behavior. Exact experiment commands and measurements are completed in task **0.6**.
 
 **Interview explanation:** REST endpoints resources ko represent karte hain. Authentication user identify karti hai; authorization workspace mein permission check karti hai. Response saved task aur email delivery ka status clearly batata hai. Redis aur RabbitMQ internal processing change karte hain, jabke frontend ka main resource contract consistent rehta hai.
+
+## 10. Architecture review and project structure
+
+Task **0.7** brings together the [overview](../README.md), HLDs, ERD and API plan above, the [roadmap](roadmap.md), and the [experiment plan](experiments.md).
+
+### 10.1 Setup decisions
+
+- Use one Git repository and npm workspaces. `apps/web` is the Next.js application; `apps/api` is the Express application. Run them in two terminals during local development.
+- The frontend uses the Next.js App Router, TypeScript and Tailwind CSS. The API uses Express, strict TypeScript and a small entry point. API feature modules are added when their tasks need them.
+- Root npm commands provide `dev:web`, `dev:api`, `start:web`, `start:api`, `build` and `typecheck`. Keep one root lockfile for reproducible installs.
+- Development defaults are frontend port 3000 and API port 3001. The setup page is a simple TeamFlow placeholder; application features begin with Phase 1.
+- Add the Prisma schema/migrations in task 0.10, environment examples and health endpoint in 0.11, backend test tools in 0.12, and V1 Docker Compose in 0.13.
+- Add the seed/load scripts as their Phase 6 tasks are reached. Add Redis in V2 and `apps/worker` plus RabbitMQ in V3. Keep worker and API responsibilities within this application.
+
+### 10.2 Structure after task 0.9
+
+```text
+TeamFlow/
+|-- apps/
+|   |-- web/
+|   |   |-- src/app/
+|   |   |   |-- globals.css
+|   |   |   |-- layout.tsx
+|   |   |   `-- page.tsx
+|   |   |-- package.json
+|   |   |-- postcss.config.mjs
+|   |   `-- tsconfig.json
+|   `-- api/
+|       |-- src/index.ts
+|       |-- package.json
+|       `-- tsconfig.json
+|-- docs/
+|   |-- architecture.md
+|   |-- experiments.md
+|   `-- roadmap.md
+|-- .gitignore
+|-- package.json
+|-- package-lock.json
+|-- README.md
+|-- checklist.md
+`-- progress.md
+
+prompt.md stays local and ignored. Build output and node_modules are ignored.
+```
+
+The folders are created in task 0.8 and populated in 0.9. Next.js-generated type files are local build support; their ignore behavior is documented in the scaffold. Future folders such as `apps/api/prisma`, `experiments/k6` and `apps/worker` are introduced only when required.
+
+### 10.3 Review outcome and authorization
+
+The plan uses the requested stack and keeps the three version boundaries. The API owns permission checks and PostgreSQL writes; Redis is temporary state; RabbitMQ/worker processing is a later upgrade. The ERD, endpoint plan and experiment scenarios use the same workspace/task/notification relationships.
+
+The user explicitly authorized continuing through task **0.9** without stopping for review, with commits after each task. That authorization covers this planning review and the basic folder/application scaffold above. Individual files and decisions remain reviewable in their commits; feature implementation and later setup tasks are reached through their own numbered tasks.
+
+**Simple explanation:** Ek repository mein frontend aur backend alag folders mein honge. Root se npm commands chalengi aur har task ka progress, commit aur push hoga. Database, tests aur Docker apne next tasks mein add karenge.

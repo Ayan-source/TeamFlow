@@ -52,7 +52,7 @@ Planning comes first. Complete the planning tasks and obtain approval before the
   - Test: Compare the roadmap against all checklist phases. Acceptance: Every task has a small scope, a simple test and acceptance criteria.
 - [x] **0.6** Plan reproducible Redis and RabbitMQ experiments in docs/experiments.md
   - Test: Review commands, inputs, expected observations and metrics for each experiment. Acceptance: The plan demonstrates caching problems, synchronous email delays and unreliable operations before infrastructure changes.
-- [ ] **0.7** Present the architecture and proposed file structure for planning approval
+- [x] **0.7** Present the architecture and proposed file structure for planning approval
   - Test: Review README.md and the three planned docs files together. Acceptance: The user approves planning before setup or implementation starts.
 - [ ] **0.8** Set up GitHub repository and project folders
   - Test: Inspect the remote, branch, folder structure and ignore rules. Acceptance: The approved structure exists and credentials are excluded from Git.
