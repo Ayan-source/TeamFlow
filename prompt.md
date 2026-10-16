@@ -49,7 +49,7 @@ Before writing application code:
 
 1. Create a simple project overview.
 2. Explain what users can do in TeamFlow.
-3. Create three High-Level Design diagrams using Mermaid.
+3. Create three High-Level Design diagrams as plain text diagrams in Markdown.
 4. Create a simple PostgreSQL ERD.
 5. Define the API endpoints.
 6. Create the complete implementation roadmap for V1, V2, and V3.

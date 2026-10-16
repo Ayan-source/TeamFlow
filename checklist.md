@@ -54,8 +54,8 @@ Planning comes first. Complete the planning tasks and obtain approval before the
 
 - [x] **0.1** Write a simple project overview and MVP scope
   - Test: Read the overview as a new user. Acceptance: README.md explains what users can do and the V1 scope.
-- [ ] **0.2** Create HLD diagrams for V1, V2 and V3
-  - Test: Render all three Mermaid diagrams. Acceptance: docs/architecture.md shows V1 PostgreSQL, V2 Redis and V3 RabbitMQ with a separate worker.
+- [x] **0.2** Create HLD diagrams for V1, V2 and V3
+  - Test: Read all three plain text diagrams in a text editor or Markdown preview and trace the request paths. Acceptance: docs/architecture.md shows V1 PostgreSQL, V2 Redis and V3 RabbitMQ with a separate worker.
 - [ ] **0.3** Create a simple database ERD
   - Test: Trace a workspace, project, task, comment and notification through the ERD. Acceptance: Relationships, keys and Supabase Auth user references are clear.
 - [ ] **0.4** Define API endpoints and user flows
