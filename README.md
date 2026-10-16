@@ -50,7 +50,7 @@ Phase 0 planning is in progress. The GitHub repository and initial commit are re
 
 - [checklist.md](checklist.md): numbered tasks, test steps and acceptance criteria.
 - [progress.md](progress.md): simple task statuses and the next task.
-- [prompt.md](prompt.md): project instructions and working rules.
+- `prompt.md`: local project instructions and working rules, excluded from Git.
 
 The architecture document contains the [V1/V2/V3 HLD diagrams](docs/architecture.md#2-versioned-high-level-design), [PostgreSQL ERD](docs/architecture.md#8-postgresql-database-erd), and [API endpoints and user flows](docs/architecture.md#9-api-endpoints-and-user-flows). Upcoming planning tasks will add the full roadmap in `docs/roadmap.md` and reproducible experiments in `docs/experiments.md`.
 

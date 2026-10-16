@@ -2,6 +2,7 @@
 
 - GitHub initialization: done. Repository connected; initial commit pushed to main.
 - Task numbering and progress tracking: done. Checklist IDs use phase.task; update this file after each task.
+- Repository housekeeping: done. Stopped tracking prompt.md; the local file stays ignored by Git.
 - Phase 0, task 0.1: done. Added the project overview, user features and MVP scope in README.md.
 - Phase 0, task 0.2: done. Revised docs/architecture.md with boxed HLDs, component ownership, request flows and failure recovery, following the ticket reservation project's structure.
 - Phase 0, task 0.3: done. Added the database ERD, table fields, keys, membership and deletion rules, and planned V3 reliability tables in docs/architecture.md.
