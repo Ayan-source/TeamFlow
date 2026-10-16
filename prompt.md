@@ -53,7 +53,7 @@ Before writing application code:
 4. Create a simple PostgreSQL ERD.
 5. Define the API endpoints.
 6. Create the complete implementation roadmap for V1, V2, and V3.
-7. Break every phase into very small checkbox tasks i have provided checklist.md so move according to this
+7. Break every phase into very small checkbox tasks following checklist.md; use its stable phase.task IDs in all task references and status updates.
 8. Add a simple test and acceptance criteria for each task.
 9. Explain how we will demonstrate the problem before introducing Redis or RabbitMQ.
 
@@ -63,6 +63,7 @@ Save the plans in:
 - `docs/architecture.md` — HLD diagrams and ERD
 - `docs/roadmap.md` — Full checkbox task list
 - `docs/experiments.md` — Problems, experiments, measurements and results
+- `progress.md` — Simple progress updates using checklist task IDs, status, what was done and the next task
 
 Do not create additional documentation files unless genuinely needed.
 
@@ -92,9 +93,9 @@ For example, during authentication:
 1. Implement signup form.
 2. Run relevant tests.
 3. Explain what was changed.
-4. Create a Git commit.
-5. Push the commit to the configured GitHub branch.
-6. Update the roadmap checkbox.
+4. Update the checklist checkbox, roadmap when it exists, and progress.md using the same task ID after checks pass.
+5. Inspect the diff, create a Git commit including these updates, and push it to the configured GitHub branch.
+6. Report the actual commit hash and push status; a failed push means delivery is still incomplete.
 7. STOP and wait for my approval.
 
 Do not automatically proceed to login.
