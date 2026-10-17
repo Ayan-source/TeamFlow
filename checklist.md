@@ -70,7 +70,7 @@ Planning comes first. Complete the planning tasks and obtain approval before the
   - Test: Inspect the remote, branch, folder structure and ignore rules. Acceptance: The approved structure exists and credentials are excluded from Git.
 - [x] **0.9** Set up Next.js, Express and TypeScript
   - Test: Start frontend and backend using documented commands. Acceptance: Both start successfully with TypeScript and Tailwind CSS configured for the frontend.
-- [ ] **0.10** Connect Supabase PostgreSQL
+- [x] **0.10** Connect Supabase PostgreSQL
   - Test: Apply the initial Prisma migration and perform a database read. Acceptance: Prisma connects to Supabase PostgreSQL and the schema can be recreated with documented commands.
 - [ ] **0.11** Add environment example and basic health check
   - Test: Start from the example configuration and call the health endpoint. Acceptance: Required variables are documented without secrets and the endpoint returns its documented status.

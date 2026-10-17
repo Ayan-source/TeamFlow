@@ -1,0 +1,22 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// The migration adds the FK to Supabase-managed auth.users using SQL.
+// Do not model or migrate Supabase's auth tables here.
+model Profile {
+  id          String   @id @db.Uuid
+  email       String   @unique @db.Text
+  displayName String?  @map("display_name") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("profiles")
+}

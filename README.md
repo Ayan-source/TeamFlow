@@ -46,7 +46,7 @@ Redis starts in V2 and RabbitMQ starts in V3. Record comparable measurements and
 
 ## Project status and setup
 
-Tasks 0.1–0.9 are complete. The basic frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Database integration is task 0.10.
+Tasks 0.1–0.10 are complete. The frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Prisma connects to Supabase PostgreSQL, and the initial `profiles` migration and database read have passed.
 
 - [checklist.md](checklist.md): numbered tasks, test steps and acceptance criteria.
 - [docs/roadmap.md](docs/roadmap.md): the complete V1/V2/V3 plan using the same task IDs and completion status.
@@ -56,7 +56,7 @@ Tasks 0.1–0.9 are complete. The basic frontend/API scaffold uses npm workspace
 
 The architecture document contains the [V1/V2/V3 HLD diagrams](docs/architecture.md#2-versioned-high-level-design), [PostgreSQL ERD](docs/architecture.md#8-postgresql-database-erd), and [API endpoints and user flows](docs/architecture.md#9-api-endpoints-and-user-flows). The [implementation roadmap](docs/roadmap.md) covers all phases; the [experiment plan](docs/experiments.md) defines how to demonstrate problems and measure changes.
 
-The [architecture and folder review](docs/architecture.md#10-architecture-review-and-project-structure) records the setup. Each task is checked, recorded, committed and pushed separately. The authorized work through task 0.9 is complete and waiting for review.
+The [architecture and folder review](docs/architecture.md#10-architecture-review-and-project-structure) records the setup. Each task is checked, recorded, committed and pushed separately.
 
 ## Local development
 
@@ -94,3 +94,47 @@ npm run build
 After building, use `npm run start:web` and `npm run start:api` in separate terminals to start the production builds. The development and production scripts use the same default ports, so stop the development servers first. Set `PORT` for the API if a different port is needed.
 
 `node_modules`, `.next`, API `dist` output and generated Next.js type files stay local and ignored. Commit package manifests and the root lockfile when dependencies change.
+
+## Supabase PostgreSQL and Prisma (task 0.10)
+
+Use a Supabase development project. Open **Connect → Session pooler** and copy its PostgreSQL connection string using port **5432**. This connection works over IPv4 and suits our persistent Express server. See the [Supabase Prisma guide](https://supabase.com/docs/guides/database/prisma).
+
+If `apps/api/.env` does not exist, copy the template from the repository root:
+
+```powershell
+Copy-Item apps/api/.env.example apps/api/.env
+```
+
+In `apps/api/.env`, replace `DATABASE_URL` with the connection string and fill in your database password. URL-encode special characters in the password. Keep credentials in this local file; Git ignores it. This database URL belongs to the backend. It is different from the Supabase project URL and browser API key used by authentication later.
+
+For local development, keep the template's `sslmode=require&uselibpqcompat=true` query parameters. This requires an encrypted connection and uses the PostgreSQL driver's libpq-compatible SSL behavior; it does not verify the server certificate. No certificate download is needed for this development setup.
+
+For deployment, download the root certificate from **Database → Settings → SSL Configuration**, save it as `apps/api/supabase-ca.crt`, and replace both development parameters with `sslmode=verify-full&sslrootcert=supabase-ca.crt`. The npm commands below run inside the API workspace, where this relative certificate path resolves. The certificate stays local and ignored. See [Supabase's SSL instructions](https://supabase.com/docs/guides/database/connecting-to-postgres#connecting-with-ssl).
+
+Run from the repository root:
+
+```powershell
+npm run db:generate
+npm run db:validate
+npm run db:migrate
+npm run db:status
+npm run db:check
+```
+
+Or, from `apps/api`, use the same five commands. The root scripts forward them to the API workspace.
+
+| Command | Purpose |
+| --- | --- |
+| `db:generate` | Generate TypeScript Prisma Client from `prisma/schema.prisma`; no database connection is needed. |
+| `db:validate` | Check the Prisma schema. |
+| `db:migrate` | Apply committed SQL migrations using `prisma migrate deploy`. |
+| `db:status` | Show whether committed migrations have been applied. |
+| `db:check` | Read the `profiles` table through Prisma and print its row count without user details or credentials. |
+
+The initial migration creates `public.profiles`, with UUID IDs referencing Supabase's existing `auth.users`, unique normalized emails, an optional display name and timestamps. Open **Table Editor → public → profiles** in Supabase to see it. It starts empty; authentication tasks will synchronize real users into profiles.
+
+The migration enables RLS and removes direct access for browser roles. Express will use its server database connection and apply application permission checks. Prisma does not manage Supabase's Auth tables. The Auth foreign key, email check and access rules are custom SQL: preserve them in later migrations.
+
+To recreate this application schema, point `.env` at another fresh Supabase development project and run `db:migrate`, then `db:check`. These commands apply migration files without a shadow database or resetting existing data. An existing database with conflicting application tables needs a migration baseline first. For future schema changes, review a new SQL migration before applying it; do not use `db push` or reset the hosted project. See [Prisma's migration command behavior](https://www.prisma.io/docs/orm/v7/prisma-migrate/workflows/development-and-production).
+
+Prisma CLI, Client and the PostgreSQL adapter use the same Prisma 7 version. The generated client lives in `apps/api/src/generated/prisma` and stays ignored. Dependency installation generates it automatically. The API uses one shared Prisma Client with at most five database connections; later route modules will import it from `src/lib/prisma.ts`.

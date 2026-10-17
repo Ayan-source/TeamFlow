@@ -13,7 +13,12 @@
     "start:web": "npm run start --workspace @teamflow/web",
     "start:api": "npm run start --workspace @teamflow/api",
     "build": "npm run build --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace @teamflow/api",
+    "db:validate": "npm run db:validate --workspace @teamflow/api",
+    "db:migrate": "npm run db:migrate --workspace @teamflow/api",
+    "db:status": "npm run db:status --workspace @teamflow/api",
+    "db:check": "npm run db:check --workspace @teamflow/api"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

@@ -426,7 +426,7 @@ Use this example to trace the relationships on paper:
 6. Deleting `T1` deletes `C1`, keeps `N1` and clears `N1.task_id`. Removing `U2` instead clears their assignments and access while preserving authorship history.
 7. In final V3, one transaction also creates event `E1` in `outbox_events`. Publication and consumption use `E1` to recover and deduplicate work.
 
-These are design checks; no live database or migration has been created. Implementation tasks will run database and permission tests against these rules.
+These are design checks for the full application. Task 0.10 introduces only `profiles`; later tasks add the remaining tables and exercise their database and permission rules.
 
 **Interview explanation:** Users aur workspaces ka many-to-many relation membership table se banta hai. Task ka workspace project ke through milta hai. PK/FK data integrity protect karte hain; membership authorization API transaction check karti hai. Redis speed improve kar sakta hai aur outbox email events recover karta hai, lekin dono permission checks ki jagah nahi lete.
 
@@ -650,10 +650,10 @@ Task **0.7** brings together the [overview](../README.md), HLDs, ERD and API pla
 - The frontend uses the Next.js App Router, TypeScript and Tailwind CSS. The API uses Express, strict TypeScript and a small entry point. API feature modules are added when their tasks need them.
 - Root npm commands provide `dev:web`, `dev:api`, `start:web`, `start:api`, `build` and `typecheck`. Keep one root lockfile for reproducible installs.
 - Development defaults are frontend port 3000 and API port 3001. The setup page is a simple TeamFlow placeholder; application features begin with Phase 1.
-- Add the Prisma schema/migrations in task 0.10, environment examples and health endpoint in 0.11, backend test tools in 0.12, and V1 Docker Compose in 0.13.
+- Task 0.10 adds Prisma configuration, the initial `profiles` migration, a shared database client and a database-read command. The user also requested the local environment file and its example during this task. The health endpoint remains task 0.11, backend test tools 0.12, and V1 Docker Compose 0.13.
 - Add the seed/load scripts as their Phase 6 tasks are reached. Add Redis in V2 and `apps/worker` plus RabbitMQ in V3. Keep worker and API responsibilities within this application.
 
-### 10.2 Structure after task 0.9
+### 10.2 Structure for task 0.10
 
 ```text
 TeamFlow/
@@ -668,8 +668,16 @@ TeamFlow/
 |   |   |-- postcss.config.mjs
 |   |   `-- tsconfig.json
 |   `-- api/
-|       |-- src/index.ts
+|       |-- prisma/
+|       |   |-- migrations/
+|       |   `-- schema.prisma
+|       |-- src/
+|       |   |-- lib/prisma.ts
+|       |   |-- scripts/check-db.ts
+|       |   `-- index.ts
+|       |-- .env.example
 |       |-- package.json
+|       |-- prisma.config.ts
 |       `-- tsconfig.json
 |-- docs/
 |   |-- architecture.md
@@ -682,10 +690,11 @@ TeamFlow/
 |-- checklist.md
 `-- progress.md
 
-prompt.md stays local and ignored. Build output and node_modules are ignored.
+prompt.md and apps/api/.env stay local and ignored.
+Build output, generated Prisma Client and node_modules are ignored.
 ```
 
-The folders are created in task 0.8 and populated in 0.9. Next.js-generated type files are local build support and stay ignored. Next.js also maintains `apps/web/AGENTS.md` with guidance for the installed version; that guide is tracked so normal startup does not leave an uncommitted generated document. Future folders such as `apps/api/prisma`, `experiments/k6` and `apps/worker` are introduced only when required.
+The folders were created in task 0.8 and populated in 0.9. Task 0.10 adds the Prisma files shown above; generated client files are local build support. Next.js-generated type files also stay ignored. Next.js maintains `apps/web/AGENTS.md` with guidance for the installed version; that guide is tracked so normal startup does not leave an uncommitted generated document. Future folders such as `experiments/k6` and `apps/worker` are introduced only when required.
 
 ### 10.3 Review outcome and authorization
 

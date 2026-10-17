@@ -7,6 +7,8 @@ build/
 coverage/
 *.tsbuildinfo
 next-env.d.ts
+apps/api/src/generated/prisma/
+apps/api/supabase-ca.crt
 
 # Local environment and credentials
 .env

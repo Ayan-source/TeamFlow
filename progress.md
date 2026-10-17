@@ -13,4 +13,6 @@
 - Phase 0, task 0.8: done. GitHub is connected and the approved apps/web/src/app and apps/api/src folders are tracked.
 - Phase 0, task 0.9: done. Added Next.js/Tailwind frontend, Express TypeScript API, npm workspaces and setup commands. Type checks, both builds and local startup/HTTP checks passed.
 
-Next task: 0.10 — Connect Supabase PostgreSQL using Prisma. Waiting for review after the authorized work through 0.9.
+- Phase 0, task 0.10: done. Connected Prisma to Supabase and created the profiles table. Added local environment setup, its example and database commands. Migration, schema validation, backend type checking/build and a Prisma read passed (0 profiles). Development uses encrypted SSL without certificate verification; full verification is documented for deployment.
+
+Next task: 0.11 — Basic health check and remaining environment configuration. The database environment example was added in 0.10 at the user's request.
