@@ -46,7 +46,7 @@ Redis starts in V2 and RabbitMQ starts in V3. Record comparable measurements and
 
 ## Project status and setup
 
-Tasks 0.1–0.10 are complete. The frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Prisma connects to Supabase PostgreSQL, and the initial `profiles` migration and database read have passed.
+Tasks 0.1–0.11 are complete. The frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Prisma connects to Supabase PostgreSQL, and the initial `profiles` migration and database read have passed. The API loads its environment file and provides a public `/health` endpoint.
 
 - [checklist.md](checklist.md): numbered tasks, test steps and acceptance criteria.
 - [docs/roadmap.md](docs/roadmap.md): the complete V1/V2/V3 plan using the same task IDs and completion status.
@@ -82,7 +82,24 @@ Start the API in another terminal:
 npm run dev:api
 ```
 
-The API listens at `http://127.0.0.1:3001` and prints its startup message. At this scaffold stage, `GET /` returns Express's default `404`; the health endpoint is added in task 0.11 and resource endpoints follow their roadmap tasks. Use Ctrl+C in each terminal to stop its server.
+The API listens at `http://127.0.0.1:3001` and prints its startup message. `GET /` returns Express's default `404`; resource endpoints follow their roadmap tasks. Use Ctrl+C in each terminal to stop its server.
+
+### Environment and health check (task 0.11)
+
+The API loads `apps/api/.env` when starting in development or production. Copy `.env.example` only if your local `.env` does not exist. Existing shell environment variables take precedence.
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `PORT` | No; defaults to `3001` | API listening port, an integer from 1 to 65535. |
+| `DATABASE_URL` | For database operations | Supabase PostgreSQL connection; see the database setup below. |
+
+With the API running, open `http://127.0.0.1:3001/health` or run:
+
+```powershell
+curl.exe -i http://127.0.0.1:3001/health
+```
+
+Expected: HTTP `200` and `{"status":"ok"}`. This public endpoint checks API process liveness; it performs no database queries and does not report database readiness. It works with the example database placeholder and returns no credentials or configuration. Use `npm run db:check` separately to verify the database connection.
 
 ## Build and TypeScript checks
 

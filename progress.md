@@ -15,4 +15,6 @@
 
 - Phase 0, task 0.10: done. Connected Prisma to Supabase and created the profiles table. Added local environment setup, its example and database commands. Migration, schema validation, backend type checking/build and a Prisma read passed (0 profiles). Development uses encrypted SSL without certificate verification; full verification is documented for deployment.
 
-Next task: 0.11 — Basic health check and remaining environment configuration. The database environment example was added in 0.10 at the user's request.
+- Phase 0, task 0.11: done. Added GET /health, API .env loading, PORT in the environment example, and setup instructions. Backend type checking/build passed. Health returned 200 with the example database placeholder; loading PORT from .env and overriding it through the shell both passed. Verification servers were stopped.
+
+Next task: 0.12 — Set up Vitest and Supertest for backend checks.
