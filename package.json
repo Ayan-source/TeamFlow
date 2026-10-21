@@ -18,7 +18,9 @@
     "db:validate": "npm run db:validate --workspace @teamflow/api",
     "db:migrate": "npm run db:migrate --workspace @teamflow/api",
     "db:status": "npm run db:status --workspace @teamflow/api",
-    "db:check": "npm run db:check --workspace @teamflow/api"
+    "db:check": "npm run db:check --workspace @teamflow/api",
+    "test": "npm run test --workspace @teamflow/api",
+    "test:watch": "npm run test:watch --workspace @teamflow/api"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

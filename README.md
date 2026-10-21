@@ -46,7 +46,7 @@ Redis starts in V2 and RabbitMQ starts in V3. Record comparable measurements and
 
 ## Project status and setup
 
-Tasks 0.1–0.11 are complete. The frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Prisma connects to Supabase PostgreSQL, and the initial `profiles` migration and database read have passed. The API loads its environment file and provides a public `/health` endpoint.
+Tasks 0.1–0.12 are complete. The frontend/API scaffold uses npm workspaces: `apps/web` contains Next.js and `apps/api` contains Express. Prisma connects to Supabase PostgreSQL, and the initial `profiles` migration and database read have passed. The API loads its environment file and provides a public `/health` endpoint, with Vitest/Supertest health and port checks.
 
 - [checklist.md](checklist.md): numbered tasks, test steps and acceptance criteria.
 - [docs/roadmap.md](docs/roadmap.md): the complete V1/V2/V3 plan using the same task IDs and completion status.
@@ -111,6 +111,29 @@ npm run build
 After building, use `npm run start:web` and `npm run start:api` in separate terminals to start the production builds. The development and production scripts use the same default ports, so stop the development servers first. Set `PORT` for the API if a different port is needed.
 
 `node_modules`, `.next`, API `dist` output and generated Next.js type files stay local and ignored. Commit package manifests and the root lockfile when dependencies change.
+
+## Backend tests (task 0.12)
+
+Run from the repository root or from `apps/api`:
+
+```powershell
+npm test
+```
+
+To rerun tests automatically when files change:
+
+```powershell
+npm run test:watch
+```
+
+[Vitest](https://vitest.dev/guide/) runs the tests and reports passing or failing assertions. [Supertest](https://github.com/forwardemail/supertest) sends HTTP requests to the Express app during tests. The app is exported from `src/app.ts`; only `src/index.ts` starts the normal server.
+
+- `src/app.test.ts` checks `GET /health`, its HTTP status, JSON content type and response body.
+- `src/config.test.ts` checks the default port, valid ports and rejected values.
+- These checks need no running API, Supabase connection or local `.env`. Supertest opens and closes a temporary HTTP listener.
+- Type checking includes test files. Production builds use `tsconfig.build.json` to exclude them from compiled output.
+
+To see an assertion failure, temporarily change the health test's expected status from `200` to `500` and run `npm test`. It should print the failed assertion and exit with a nonzero code. Restore `200` afterward.
 
 ## Supabase PostgreSQL and Prisma (task 0.10)
 

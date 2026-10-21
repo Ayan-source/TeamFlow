@@ -5,6 +5,7 @@ out/
 dist/
 build/
 coverage/
+.vitest/
 *.tsbuildinfo
 next-env.d.ts
 apps/api/src/generated/prisma/

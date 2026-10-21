@@ -62,7 +62,7 @@ Planning comes first. Complete the planning tasks and obtain approval before the
   - Test: Apply the initial Prisma migration and perform a database read. Acceptance: Prisma connects to Supabase PostgreSQL and the schema can be recreated with documented commands.
 - [x] **0.11** Add environment example and basic health check
   - Test: Start from the example configuration and call the health endpoint. Acceptance: Required variables are documented without secrets and the endpoint returns its documented status.
-- [ ] **0.12** Set up Vitest and Supertest for backend checks
+- [x] **0.12** Set up Vitest and Supertest for backend checks
   - Test: Run a small health-endpoint test and a simple unit test. Acceptance: Both tools run using documented commands and report failures correctly.
 - [ ] **0.13** Add Docker Compose for the approved V1 local processes
   - Test: Start and stop the configured V1 processes using the documented Compose commands. Acceptance: V1 uses Supabase PostgreSQL and includes no Redis or RabbitMQ services.

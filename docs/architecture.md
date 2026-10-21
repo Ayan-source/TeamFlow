@@ -648,12 +648,12 @@ Task **0.7** brings together the [overview](../README.md), HLDs, ERD and API pla
 
 - Use one Git repository and npm workspaces. `apps/web` is the Next.js application; `apps/api` is the Express application. Run them in two terminals during local development.
 - The frontend uses the Next.js App Router, TypeScript and Tailwind CSS. The API uses Express, strict TypeScript and a small entry point. API feature modules are added when their tasks need them.
-- Root npm commands provide `dev:web`, `dev:api`, `start:web`, `start:api`, `build` and `typecheck`. Keep one root lockfile for reproducible installs.
+- Root npm commands provide `dev:web`, `dev:api`, `start:web`, `start:api`, `build`, `typecheck`, `test` and `test:watch`. Keep one root lockfile for reproducible installs.
 - Development defaults are frontend port 3000 and API port 3001. The setup page is a simple TeamFlow placeholder; application features begin with Phase 1.
-- Task 0.10 added Prisma configuration, the initial `profiles` migration, a shared database client and a database-read command, plus the requested local environment file and its example. Task 0.11 added environment loading at API startup, optional `PORT` configuration and public `GET /health`, returning `200 { "status": "ok" }` without querying the database. Backend test tools remain task 0.12, and V1 Docker Compose 0.13.
+- Task 0.10 added Prisma configuration, the initial `profiles` migration, a shared database client and a database-read command, plus the requested local environment file and its example. Task 0.11 added environment loading at API startup, optional `PORT` configuration and public `GET /health`, returning `200 { "status": "ok" }` without querying the database. Task 0.12 adds Vitest, Supertest, health/port checks and a separate Express app export for testing. V1 Docker Compose remains task 0.13.
 - Add the seed/load scripts as their Phase 6 tasks are reached. Add Redis in V2 and `apps/worker` plus RabbitMQ in V3. Keep worker and API responsibilities within this application.
 
-### 10.2 Structure after task 0.11
+### 10.2 Structure after task 0.12
 
 ```text
 TeamFlow/
@@ -672,13 +672,19 @@ TeamFlow/
 |       |   |-- migrations/
 |       |   `-- schema.prisma
 |       |-- src/
+|       |   |-- app.ts
+|       |   |-- app.test.ts
+|       |   |-- config.ts
+|       |   |-- config.test.ts
 |       |   |-- lib/prisma.ts
 |       |   |-- scripts/check-db.ts
 |       |   `-- index.ts
 |       |-- .env.example
 |       |-- package.json
 |       |-- prisma.config.ts
-|       `-- tsconfig.json
+|       |-- tsconfig.json
+|       |-- tsconfig.build.json
+|       `-- vitest.config.ts
 |-- docs/
 |   |-- architecture.md
 |   |-- experiments.md

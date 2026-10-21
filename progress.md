@@ -17,4 +17,6 @@
 
 - Phase 0, task 0.11: done. Added GET /health, API .env loading, PORT in the environment example, and setup instructions. Backend type checking/build passed. Health returned 200 with the example database placeholder; loading PORT from .env and overriding it through the shell both passed. Verification servers were stopped.
 
-Next task: 0.12 — Set up Vitest and Supertest for backend checks.
+- Phase 0, task 0.12: done. Added Vitest and Supertest, a health endpoint test and port-validation unit tests. All 11 tests, backend type checking and production build passed. Confirmed a temporary failing assertion returns exit code 1, removed it and reran the passing suite. Added test commands at the root and in apps/api; production output excludes tests.
+
+Next task: 0.13 — Add Docker Compose for the approved V1 local processes.
